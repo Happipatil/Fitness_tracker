@@ -308,7 +308,8 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
       day,
       exIndex: 0,
       setIndex: 0,
-      exerciseResults: []
+      exerciseResults: [],
+      pendingPrefill: null
     };
     renderLogTab();
   }
@@ -362,6 +363,14 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
       logState = null;
       renderLogTab();
     }
+  }
+  
+  if (action === "quick-reps") {
+    document.getElementById("log-reps").value = e.target.dataset.value;
+  }
+
+  if (action === "go-back") {
+    goBack();
   }
 
   if (action === "log-another") {
