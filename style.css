@@ -233,3 +233,14 @@ label input {
 .btn-secondary {
   background: #999;
 }
+
+
+.quick-reps {
+  display: flex;
+  gap: 8px;
+  margin: -6px 0 10px;
+}
+
+.quick-reps button {
+  flex: 1;
+}
