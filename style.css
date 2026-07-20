@@ -1,0 +1,230 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #f5f6f8;
+  color: #1d1d1f;
+  padding-bottom: 70px; /* leaves room so content doesn't hide behind the tab bar */
+}
+
+.app-header {
+  background: #1d1d1f;
+  color: white;
+  padding: 16px;
+  text-align: center;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+main {
+  padding: 16px;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin-top: 0;
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 20px 0 8px;
+  color: #444;
+}
+
+/* ---------- Bottom tab bar ---------- */
+
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: white;
+  border-top: 1px solid #ddd;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 14px 0;
+  border: none;
+  background: none;
+  font-size: 0.95rem;
+  color: #888;
+}
+
+.tab-btn.active {
+  color: #2a9d8f;
+  font-weight: 600;
+  border-top: 2px solid #2a9d8f;
+}
+
+/* ---------- Generic buttons ---------- */
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  background: #2a9d8f;
+  color: white;
+}
+
+button:active {
+  opacity: 0.8;
+}
+
+.btn-small {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  background: #457b9d;
+}
+
+.btn-danger {
+  background: #e63946;
+}
+
+.cancel-btn {
+  display: block;
+  margin-top: 20px;
+  width: 100%;
+}
+
+/* ---------- Inputs ---------- */
+
+input, select {
+  padding: 8px;
+  font-size: 0.95rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+
+label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+label input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ---------- Setup tab ---------- */
+
+.day-card {
+  background: white;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.day-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.exercise-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+}
+
+.exercise-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9rem;
+}
+
+.add-exercise-form,
+.add-day-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.add-exercise-form input,
+.add-day-form input {
+  flex: 1;
+  min-width: 100px;
+}
+
+/* ---------- Log tab ---------- */
+
+.day-pick-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 14px;
+  font-size: 1rem;
+}
+
+.log-progress {
+  color: #555;
+  font-size: 0.9rem;
+  margin: 4px 0;
+}
+
+.log-form {
+  background: white;
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.log-form button {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* ---------- History tab ---------- */
+
+.history-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.history-controls select {
+  flex: 1;
+}
+
+#history-chart-area canvas {
+  background: white;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 20px;
+}
+
+/* ---------- Misc ---------- */
+
+.empty-msg {
+  color: #888;
+  text-align: center;
+  margin-top: 40px;
+}
