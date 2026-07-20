@@ -227,6 +227,7 @@ function renderLogTab() {
   }
 
   const isFeelStep = logState.setIndex >= exercise.sets;
+  const result = logState.exerciseResults.find(r => r.exerciseId === exercise.id);
 
   let html = `
     <h2>${escapeHtml(day.name)}</h2>
@@ -234,22 +235,61 @@ function renderLogTab() {
   `;
 
   if (!isFeelStep) {
+    // Decide what to pre-fill. If we just pressed Back, restore the exact
+    // old values for this set. Otherwise, only pre-fill weight from the
+    // previous set (reps/RPE stay blank, but we offer quick-rep buttons).
+    let prefillWeight = "";
+    let prefillReps = "";
+    let prefillRpe = "";
+    let quickReps = null;
+
+    if (logState.pendingPrefill) {
+      prefillWeight = logState.pendingPrefill.weight;
+      prefillReps = logState.pendingPrefill.reps;
+      prefillRpe = logState.pendingPrefill.rpe;
+    } else if (result && result.sets.length > 0) {
+      const lastSet = result.sets[result.sets.length - 1];
+      prefillWeight = lastSet.weight;
+      quickReps = lastSet.reps;
+    }
+
     html += `
       <p class="log-progress">Set ${logState.setIndex + 1} of ${exercise.sets}</p>
       <div class="log-form">
-        <label>Weight (kg) <input type="number" step="0.5" id="log-weight" /></label>
-        <label>Reps <input type="number" id="log-reps" /></label>
-        <label>RPE (1-10) <input type="number" step="0.5" min="1" max="10" id="log-rpe" /></label>
+        <label>Weight (kg) <input type="number" step="0.5" id="log-weight" value="${prefillWeight}" /></label>
+        <label>Reps <input type="number" id="log-reps" value="${prefillReps}" /></label>
+    `;
+
+    if (quickReps !== null) {
+      html += `
+        <div class="quick-reps">
+          <button type="button" class="btn-small btn-secondary" data-action="quick-reps" data-value="${quickReps}">Same (${quickReps})</button>
+          <button type="button" class="btn-small btn-secondary" data-action="quick-reps" data-value="${quickReps - 2}">-2 (${quickReps - 2})</button>
+        </div>
+      `;
+    }
+
+    html += `
+        <label>RPE (1-10) <input type="number" step="0.5" min="1" max="10" id="log-rpe" value="${prefillRpe}" /></label>
         <button data-action="submit-set">Next</button>
       </div>
     `;
   } else {
+    const prefillFeel = logState.pendingPrefill ? logState.pendingPrefill.feel : "";
     html += `
       <div class="log-form">
-        <label>How did this exercise feel? (1-10) <input type="number" min="1" max="10" id="log-feel" /></label>
+        <label>How did this exercise feel? (1-10) <input type="number" min="1" max="10" id="log-feel" value="${prefillFeel || ""}" /></label>
         <button data-action="submit-feel">Next</button>
       </div>
     `;
+  }
+
+  // pendingPrefill is one-shot — clear it now that this render used it.
+  logState.pendingPrefill = null;
+
+  const isVeryFirstStep = logState.exIndex === 0 && logState.setIndex === 0;
+  if (!isVeryFirstStep) {
+    html += `<button class="btn-secondary" data-action="go-back">← Back</button>`;
   }
 
   html += `<button class="btn-danger cancel-btn" data-action="cancel-session">Cancel Session</button>`;
