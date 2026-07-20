@@ -63,6 +63,14 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 // SETUP TAB
 // ============================================================
 
+// Tracks which "add" form is currently expanded, if any.
+// openDayForExercise: a day's id if that day's "add exercise" form is open, else null.
+// showAddDayForm: true if the "add new day" form is open.
+let setupState = {
+  openDayForExercise: null,
+  showAddDayForm: false
+};
+
 function renderSetupTab() {
   const container = document.getElementById("tab-setup");
 
@@ -91,26 +99,109 @@ function renderSetupTab() {
       `;
     });
 
-    html += `
-        </ul>
+    html += `</ul>`;
+
+    // Only show the add-exercise form if this day's form is toggled open.
+    if (setupState.openDayForExercise === day.id) {
+      html += `
         <div class="add-exercise-form">
           <input type="text" placeholder="Exercise name" id="ex-name-${day.id}" />
           <input type="number" placeholder="Sets" min="1" id="ex-sets-${day.id}" style="width:70px" />
-          <button class="btn-small" data-action="add-exercise" data-day="${day.id}">Add Exercise</button>
+          <button class="btn-small" data-action="add-exercise" data-day="${day.id}">Add</button>
+          <button class="btn-small btn-secondary" data-action="close-add-exercise" data-day="${day.id}">Done</button>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      html += `
+        <button class="btn-small" data-action="open-add-exercise" data-day="${day.id}">+ Add Exercise</button>
+      `;
+    }
+
+    html += `</div>`; // closes .day-card
   });
 
-  html += `
-    <div class="add-day-form">
-      <input type="text" placeholder="New day name (e.g. Push)" id="new-day-name" />
-      <button data-action="add-day">Add Day</button>
-    </div>
-  `;
+  // Only show the add-day form if toggled open.
+  if (setupState.showAddDayForm) {
+    html += `
+      <div class="add-day-form">
+        <input type="text" placeholder="New day name (e.g. Push)" id="new-day-name" />
+        <button data-action="add-day">Add</button>
+        <button class="btn-secondary" data-action="close-add-day">Done</button>
+      </div>
+    `;
+  } else {
+    html += `<button data-action="open-add-day">+ Add Day</button>`;
+  }
 
   container.innerHTML = html;
 }
+
+document.getElementById("tab-setup").addEventListener("click", (e) => {
+  const action = e.target.dataset.action;
+  if (!action) return;
+
+  if (action === "open-add-day") {
+    setupState.showAddDayForm = true;
+    renderSetupTab();
+  }
+
+  if (action === "close-add-day") {
+    setupState.showAddDayForm = false;
+    renderSetupTab();
+  }
+
+  if (action === "add-day") {
+    const input = document.getElementById("new-day-name");
+    const name = input.value.trim();
+    if (!name) return;
+    appData.split.push({ id: makeId(), name, exercises: [] });
+    saveData(appData);
+    // Keep the form open so they can add another day right away.
+    renderSetupTab();
+  }
+
+  if (action === "delete-day") {
+    const dayId = e.target.dataset.day;
+    appData.split = appData.split.filter(d => d.id !== dayId);
+    saveData(appData);
+    renderSetupTab();
+  }
+
+  if (action === "open-add-exercise") {
+    setupState.openDayForExercise = e.target.dataset.day;
+    renderSetupTab();
+  }
+
+  if (action === "close-add-exercise") {
+    setupState.openDayForExercise = null;
+    renderSetupTab();
+  }
+
+  if (action === "add-exercise") {
+    const dayId = e.target.dataset.day;
+    const nameInput = document.getElementById(`ex-name-${dayId}`);
+    const setsInput = document.getElementById(`ex-sets-${dayId}`);
+    const name = nameInput.value.trim();
+    const sets = parseInt(setsInput.value, 10);
+    if (!name || !sets || sets < 1) return;
+
+    const day = appData.split.find(d => d.id === dayId);
+    day.exercises.push({ id: makeId(), name, sets });
+    saveData(appData);
+    // Keep the form open (setupState.openDayForExercise unchanged) so they
+    // can add several exercises in a row without re-tapping "+ Add Exercise".
+    renderSetupTab();
+  }
+
+  if (action === "delete-exercise") {
+    const dayId = e.target.dataset.day;
+    const exId = e.target.dataset.exercise;
+    const day = appData.split.find(d => d.id === dayId);
+    day.exercises = day.exercises.filter(ex => ex.id !== exId);
+    saveData(appData);
+    renderSetupTab();
+  }
+});
 
 // Escape user text so it can't break our HTML if they type < > etc.
 function escapeHtml(str) {
