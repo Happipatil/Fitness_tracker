@@ -297,6 +297,32 @@ function renderLogTab() {
   container.innerHTML = html;
 }
 
+
+function goBack() {
+  const day = logState.day;
+  const exercise = day.exercises[logState.exIndex];
+
+  if (logState.setIndex === 0) {
+    // First set of this exercise — step back into the previous exercise's feel rating.
+    if (logState.exIndex === 0) return; // nothing before the very first step
+    logState.exIndex--;
+    const prevExercise = day.exercises[logState.exIndex];
+    const prevResult = logState.exerciseResults.find(r => r.exerciseId === prevExercise.id);
+    logState.setIndex = prevExercise.sets; // lands back on that exercise's feel step
+    logState.pendingPrefill = { feel: prevResult.feel };
+    prevResult.feel = null;
+  } else {
+    // Mid-sets or on the feel step — step back into the last submitted set.
+    logState.setIndex--;
+    const result = logState.exerciseResults.find(r => r.exerciseId === exercise.id);
+    const removedSet = result.sets.pop();
+    logState.pendingPrefill = { weight: removedSet.weight, reps: removedSet.reps, rpe: removedSet.rpe };
+  }
+
+  renderLogTab();
+}
+
+
 document.getElementById("tab-log").addEventListener("click", (e) => {
   const action = e.target.dataset.action;
   if (!action) return;
