@@ -330,10 +330,191 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
 });
 
 // ============================================================
-// HISTORY TAB — placeholder for now, built in Step 4
+// HISTORY TAB
 // ============================================================
+
+// Remembers the user's current picks so the view survives re-renders.
+let historyState = {
+  exerciseId: null,
+  range: "month"   // "day" | "week" | "month" | "year"
+};
+
+// Keep a reference to the active Chart.js instances so we can destroy
+// them before drawing new ones (Chart.js requires this, or charts stack up).
+let activeCharts = [];
+
+function getAllExercisesFromSplit() {
+  // Flatten every exercise across every day into one list, with day name attached.
+  const list = [];
+  appData.split.forEach(day => {
+    day.exercises.forEach(ex => {
+      list.push({ id: ex.id, name: ex.name, dayName: day.name });
+    });
+  });
+  return list;
+}
+
 function renderHistoryTab() {
-  document.getElementById("tab-history").innerHTML = `<h2>History</h2><p>Coming in Step 4.</p>`;
+  const container = document.getElementById("tab-history");
+
+  if (appData.sessions.length === 0) {
+    container.innerHTML = `<p class="empty-msg">No sessions logged yet. Log a session first.</p>`;
+    return;
+  }
+
+  const exercises = getAllExercisesFromSplit();
+
+  let html = `<h2>History</h2>`;
+
+  html += `<div class="history-controls">`;
+  html += `<select id="history-exercise-select">`;
+  html += `<option value="">-- Select exercise --</option>`;
+  exercises.forEach(ex => {
+    const selected = ex.id === historyState.exerciseId ? "selected" : "";
+    html += `<option value="${ex.id}" ${selected}>${escapeHtml(ex.name)} (${escapeHtml(ex.dayName)})</option>`;
+  });
+  html += `</select>`;
+
+  html += `<select id="history-range-select">`;
+  ["day", "week", "month", "year"].forEach(r => {
+    const selected = r === historyState.range ? "selected" : "";
+    html += `<option value="${r}" ${selected}>${r}</option>`;
+  });
+  html += `</select>`;
+  html += `</div>`;
+
+  html += `<div id="history-chart-area"></div>`;
+
+  container.innerHTML = html;
+
+  // If an exercise was already picked (e.g. re-render after switching tabs), draw immediately.
+  if (historyState.exerciseId) {
+    drawHistoryCharts();
+  }
+}
+
+document.getElementById("tab-history").addEventListener("change", (e) => {
+  if (e.target.id === "history-exercise-select") {
+    historyState.exerciseId = e.target.value || null;
+    drawHistoryCharts();
+  }
+  if (e.target.id === "history-range-select") {
+    historyState.range = e.target.value;
+    drawHistoryCharts();
+  }
+});
+
+// Given a session date and the chosen range, returns true if that
+// session falls within the current range window (e.g. "this month").
+function isWithinRange(dateStr, range) {
+  const now = new Date();
+  const d = new Date(dateStr);
+
+  if (range === "day") {
+    return d.toDateString() === now.toDateString();
+  }
+  if (range === "week") {
+    const weekAgo = new Date(now);
+    weekAgo.setDate(now.getDate() - 7);
+    return d >= weekAgo && d <= now;
+  }
+  if (range === "month") {
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }
+  if (range === "year") {
+    return d.getFullYear() === now.getFullYear();
+  }
+  return true;
+}
+
+function drawHistoryCharts() {
+  const chartArea = document.getElementById("history-chart-area");
+  if (!historyState.exerciseId) {
+    chartArea.innerHTML = "";
+    return;
+  }
+
+  // Destroy old chart instances before making new ones, or Chart.js
+  // will throw an error about re-using a canvas that's already in use.
+  activeCharts.forEach(c => c.destroy());
+  activeCharts = [];
+
+  // Collect every logged data point for this exercise, across all sessions,
+  // filtered to the selected time range.
+  const points = []; // { date, avgWeight, maxWeight, avgRpe, feel }
+
+  appData.sessions.forEach(session => {
+    if (!isWithinRange(session.date, historyState.range)) return;
+
+    const exResult = session.exercises.find(ex => ex.exerciseId === historyState.exerciseId);
+    if (!exResult || exResult.sets.length === 0) return;
+
+    const weights = exResult.sets.map(s => s.weight);
+    const rpes = exResult.sets.map(s => s.rpe);
+
+    points.push({
+      date: session.date,
+      avgWeight: weights.reduce((a, b) => a + b, 0) / weights.length,
+      maxWeight: Math.max(...weights),
+      avgRpe: rpes.reduce((a, b) => a + b, 0) / rpes.length,
+      feel: exResult.feel
+    });
+  });
+
+  // Sort oldest to newest so the line chart reads left-to-right correctly.
+  points.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  if (points.length === 0) {
+    chartArea.innerHTML = `<p class="empty-msg">No logged data for this exercise in this range.</p>`;
+    return;
+  }
+
+  const labels = points.map(p => new Date(p.date).toLocaleDateString());
+
+  chartArea.innerHTML = `
+    <h3>Weight Progression</h3>
+    <canvas id="chart-weight"></canvas>
+    <h3>RPE Trend</h3>
+    <canvas id="chart-rpe"></canvas>
+    <h3>Feel Rating Trend</h3>
+    <canvas id="chart-feel"></canvas>
+  `;
+
+  const weightChart = new Chart(document.getElementById("chart-weight"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Max Weight", data: points.map(p => p.maxWeight), borderColor: "#e63946", fill: false },
+        { label: "Avg Weight", data: points.map(p => p.avgWeight), borderColor: "#457b9d", fill: false }
+      ]
+    },
+    options: { responsive: true }
+  });
+
+  const rpeChart = new Chart(document.getElementById("chart-rpe"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Avg RPE", data: points.map(p => p.avgRpe), borderColor: "#f4a261", fill: false }
+      ]
+    },
+    options: { responsive: true, scales: { y: { min: 0, max: 10 } } }
+  });
+
+  const feelChart = new Chart(document.getElementById("chart-feel"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Feel", data: points.map(p => p.feel), borderColor: "#2a9d8f", fill: false }
+      ]
+    },
+    options: { responsive: true, scales: { y: { min: 0, max: 10 } } }
+  });
+
+  activeCharts = [weightChart, rpeChart, feelChart];
 }
 
 // ============================================================
