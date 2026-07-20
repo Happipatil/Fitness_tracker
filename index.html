@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Fitness Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="app-header">
+    <h1>Fitness Tracker</h1>
+  </header>
+
+  <!-- Tab content areas -->
+  <main id="app">
+    <section id="tab-setup" class="tab-panel active"></section>
+    <section id="tab-log" class="tab-panel"></section>
+    <section id="tab-history" class="tab-panel"></section>
+  </main>
+
+  <!-- Bottom tab bar -->
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-tab="tab-setup">Setup</button>
+    <button class="tab-btn" data-tab="tab-log">Log</button>
+    <button class="tab-btn" data-tab="tab-history">History</button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
