@@ -228,3 +228,8 @@ label input {
   text-align: center;
   margin-top: 40px;
 }
+
+
+.btn-secondary {
+  background: #999;
+}
