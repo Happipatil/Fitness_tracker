@@ -4,8 +4,6 @@
 
 const STORAGE_KEY = "fitnessTrackerData";
 
-// The shape of our whole app's data.
-// split: the workout plan. sessions: logged history (built in Step 3).
 function getDefaultData() {
   return {
     split: [],
@@ -28,13 +26,16 @@ function saveData(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-// Load once when the app starts; we keep this in memory and
-// write it back to localStorage every time it changes.
 let appData = loadData();
 
-// Small helper to make unique-enough IDs without a library.
 function makeId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 // ============================================================
@@ -49,7 +50,6 @@ function showTab(tabId) {
     btn.classList.toggle("active", btn.dataset.tab === tabId);
   });
 
-  // Re-render the tab we just switched to, so it always shows fresh data.
   if (tabId === "tab-setup") renderSetupTab();
   if (tabId === "tab-log") renderLogTab();
   if (tabId === "tab-history") renderHistoryTab();
@@ -63,9 +63,6 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 // SETUP TAB
 // ============================================================
 
-// Tracks which "add" form is currently expanded, if any.
-// openDayForExercise: a day's id if that day's "add exercise" form is open, else null.
-// showAddDayForm: true if the "add new day" form is open.
 let setupState = {
   openDayForExercise: null,
   showAddDayForm: false
@@ -101,7 +98,6 @@ function renderSetupTab() {
 
     html += `</ul>`;
 
-    // Only show the add-exercise form if this day's form is toggled open.
     if (setupState.openDayForExercise === day.id) {
       html += `
         <div class="add-exercise-form">
@@ -117,10 +113,9 @@ function renderSetupTab() {
       `;
     }
 
-    html += `</div>`; // closes .day-card
+    html += `</div>`;
   });
 
-  // Only show the add-day form if toggled open.
   if (setupState.showAddDayForm) {
     html += `
       <div class="add-day-form">
@@ -156,7 +151,6 @@ document.getElementById("tab-setup").addEventListener("click", (e) => {
     if (!name) return;
     appData.split.push({ id: makeId(), name, exercises: [] });
     saveData(appData);
-    // Keep the form open so they can add another day right away.
     renderSetupTab();
   }
 
@@ -188,62 +182,6 @@ document.getElementById("tab-setup").addEventListener("click", (e) => {
     const day = appData.split.find(d => d.id === dayId);
     day.exercises.push({ id: makeId(), name, sets });
     saveData(appData);
-    // Keep the form open (setupState.openDayForExercise unchanged) so they
-    // can add several exercises in a row without re-tapping "+ Add Exercise".
-    renderSetupTab();
-  }
-
-  if (action === "delete-exercise") {
-    const dayId = e.target.dataset.day;
-    const exId = e.target.dataset.exercise;
-    const day = appData.split.find(d => d.id === dayId);
-    day.exercises = day.exercises.filter(ex => ex.id !== exId);
-    saveData(appData);
-    renderSetupTab();
-  }
-});
-
-// Escape user text so it can't break our HTML if they type < > etc.
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-// Event delegation: one listener on the container handles all clicks,
-// instead of attaching a listener to every single button (which would
-// break every time we re-render).
-document.getElementById("tab-setup").addEventListener("click", (e) => {
-  const action = e.target.dataset.action;
-  if (!action) return;
-
-  if (action === "add-day") {
-    const input = document.getElementById("new-day-name");
-    const name = input.value.trim();
-    if (!name) return;
-    appData.split.push({ id: makeId(), name, exercises: [] });
-    saveData(appData);
-    renderSetupTab();
-  }
-
-  if (action === "delete-day") {
-    const dayId = e.target.dataset.day;
-    appData.split = appData.split.filter(d => d.id !== dayId);
-    saveData(appData);
-    renderSetupTab();
-  }
-
-  if (action === "add-exercise") {
-    const dayId = e.target.dataset.day;
-    const nameInput = document.getElementById(`ex-name-${dayId}`);
-    const setsInput = document.getElementById(`ex-sets-${dayId}`);
-    const name = nameInput.value.trim();
-    const sets = parseInt(setsInput.value, 10);
-    if (!name || !sets || sets < 1) return;
-
-    const day = appData.split.find(d => d.id === dayId);
-    day.exercises.push({ id: makeId(), name, sets });
-    saveData(appData);
     renderSetupTab();
   }
 
@@ -261,20 +199,16 @@ document.getElementById("tab-setup").addEventListener("click", (e) => {
 // LOG TAB
 // ============================================================
 
-// null when no session is in progress. Otherwise holds:
-// { day, exIndex, setIndex, exerciseResults: [] }
 let logState = null;
 
 function renderLogTab() {
   const container = document.getElementById("tab-log");
 
-  // No split defined yet — nothing to log.
   if (appData.split.length === 0) {
     container.innerHTML = `<p class="empty-msg">Set up a split first in the Setup tab.</p>`;
     return;
   }
 
-  // No session in progress — show day picker.
   if (!logState) {
     let html = `<h2>Start a Session</h2>`;
     appData.split.forEach(day => {
@@ -287,7 +221,6 @@ function renderLogTab() {
   const day = logState.day;
   const exercise = day.exercises[logState.exIndex];
 
-  // Safety check: if the exercise has 0 sets somehow, skip it.
   if (!exercise) {
     finishSession();
     return;
@@ -335,7 +268,7 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
       day,
       exIndex: 0,
       setIndex: 0,
-      exerciseResults: []   // will hold { exerciseId, name, sets: [], feel: null } per exercise
+      exerciseResults: []
     };
     renderLogTab();
   }
@@ -352,7 +285,6 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
 
     const exercise = logState.day.exercises[logState.exIndex];
 
-    // Find or create this exercise's result entry.
     let result = logState.exerciseResults.find(r => r.exerciseId === exercise.id);
     if (!result) {
       result = { exerciseId: exercise.id, name: exercise.name, sets: [], feel: null };
@@ -375,7 +307,6 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
     const result = logState.exerciseResults.find(r => r.exerciseId === exercise.id);
     result.feel = feel;
 
-    // Move to next exercise, reset set counter.
     logState.exIndex++;
     logState.setIndex = 0;
 
@@ -391,6 +322,10 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
       logState = null;
       renderLogTab();
     }
+  }
+
+  if (action === "log-another") {
+    renderLogTab();
   }
 });
 
@@ -414,28 +349,18 @@ function finishSession() {
   `;
 }
 
-document.getElementById("tab-log").addEventListener("click", (e) => {
-  if (e.target.dataset.action === "log-another") {
-    renderLogTab();
-  }
-});
-
 // ============================================================
 // HISTORY TAB
 // ============================================================
 
-// Remembers the user's current picks so the view survives re-renders.
 let historyState = {
   exerciseId: null,
-  range: "month"   // "day" | "week" | "month" | "year"
+  range: "month"
 };
 
-// Keep a reference to the active Chart.js instances so we can destroy
-// them before drawing new ones (Chart.js requires this, or charts stack up).
 let activeCharts = [];
 
 function getAllExercisesFromSplit() {
-  // Flatten every exercise across every day into one list, with day name attached.
   const list = [];
   appData.split.forEach(day => {
     day.exercises.forEach(ex => {
@@ -478,7 +403,6 @@ function renderHistoryTab() {
 
   container.innerHTML = html;
 
-  // If an exercise was already picked (e.g. re-render after switching tabs), draw immediately.
   if (historyState.exerciseId) {
     drawHistoryCharts();
   }
@@ -495,8 +419,6 @@ document.getElementById("tab-history").addEventListener("change", (e) => {
   }
 });
 
-// Given a session date and the chosen range, returns true if that
-// session falls within the current range window (e.g. "this month").
 function isWithinRange(dateStr, range) {
   const now = new Date();
   const d = new Date(dateStr);
@@ -525,14 +447,10 @@ function drawHistoryCharts() {
     return;
   }
 
-  // Destroy old chart instances before making new ones, or Chart.js
-  // will throw an error about re-using a canvas that's already in use.
   activeCharts.forEach(c => c.destroy());
   activeCharts = [];
 
-  // Collect every logged data point for this exercise, across all sessions,
-  // filtered to the selected time range.
-  const points = []; // { date, avgWeight, maxWeight, avgRpe, feel }
+  const points = [];
 
   appData.sessions.forEach(session => {
     if (!isWithinRange(session.date, historyState.range)) return;
@@ -552,7 +470,6 @@ function drawHistoryCharts() {
     });
   });
 
-  // Sort oldest to newest so the line chart reads left-to-right correctly.
   points.sort((a, b) => new Date(a.date) - new Date(b.date));
 
   if (points.length === 0) {
