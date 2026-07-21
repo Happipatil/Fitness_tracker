@@ -425,12 +425,15 @@ function finishSession() {
 }
 
 // ============================================================
-// HISTORY TAB
+// HISTORY TAB (shown to user as "Progress")
 // ============================================================
 
 let historyState = {
   exerciseId: null,
-  range: "month"
+  range: "month",
+  calendarMode: false,
+  metrics: { weight: true, reps: true, rpe: false, feel: false },
+  selectedLabel: null   // date-key of the point last clicked, for the table
 };
 
 let activeCharts = [];
@@ -455,7 +458,7 @@ function renderHistoryTab() {
 
   const exercises = getAllExercisesFromSplit();
 
-  let html = `<h2>History</h2>`;
+  let html = `<h2>Progress</h2>`;
 
   html += `<div class="history-controls">`;
   html += `<select id="history-exercise-select">`;
@@ -474,7 +477,23 @@ function renderHistoryTab() {
   html += `</select>`;
   html += `</div>`;
 
+  html += `<label class="calendar-toggle">
+    <input type="checkbox" id="history-calendar-toggle" ${historyState.calendarMode ? "checked" : ""} />
+    Calendar view (show gaps for missed days)
+  </label>`;
+
+  html += `<div class="metric-toggles">`;
+  const metricLabels = { weight: "Weight", reps: "Reps", rpe: "RPE", feel: "Feel" };
+  Object.keys(metricLabels).forEach(key => {
+    html += `<label>
+      <input type="checkbox" class="metric-toggle" data-metric="${key}" ${historyState.metrics[key] ? "checked" : ""} />
+      ${metricLabels[key]}
+    </label>`;
+  });
+  html += `</div>`;
+
   html += `<div id="history-chart-area"></div>`;
+  html += `<div id="history-table-area"></div>`;
 
   container.innerHTML = html;
 
@@ -486,118 +505,215 @@ function renderHistoryTab() {
 document.getElementById("tab-history").addEventListener("change", (e) => {
   if (e.target.id === "history-exercise-select") {
     historyState.exerciseId = e.target.value || null;
+    historyState.selectedLabel = null;
     drawHistoryCharts();
   }
   if (e.target.id === "history-range-select") {
     historyState.range = e.target.value;
+    historyState.selectedLabel = null;
+    drawHistoryCharts();
+  }
+  if (e.target.id === "history-calendar-toggle") {
+    historyState.calendarMode = e.target.checked;
+    drawHistoryCharts();
+  }
+  if (e.target.classList.contains("metric-toggle")) {
+    historyState.metrics[e.target.dataset.metric] = e.target.checked;
     drawHistoryCharts();
   }
 });
 
-function isWithinRange(dateStr, range) {
+function getRangeBounds(range) {
   const now = new Date();
-  const d = new Date(dateStr);
-
+  let start, end = new Date(now);
   if (range === "day") {
-    return d.toDateString() === now.toDateString();
+    start = new Date(now);
+  } else if (range === "week") {
+    start = new Date(now);
+    start.setDate(now.getDate() - 6);
+  } else if (range === "month") {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (range === "year") {
+    start = new Date(now.getFullYear(), 0, 1);
+    end = new Date(now.getFullYear(), 11, 31);
   }
-  if (range === "week") {
-    const weekAgo = new Date(now);
-    weekAgo.setDate(now.getDate() - 7);
-    return d >= weekAgo && d <= now;
+  return { start, end };
+}
+
+function dateKey(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function generateCalendarLabels(range) {
+  const { start, end } = getRangeBounds(range);
+  const labels = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    labels.push(dateKey(cur));
+    cur.setDate(cur.getDate() + 1);
   }
-  if (range === "month") {
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-  }
-  if (range === "year") {
-    return d.getFullYear() === now.getFullYear();
-  }
-  return true;
+  return labels;
+}
+
+function isWithinRange(dStr, range) {
+  const { start, end } = getRangeBounds(range);
+  const d = new Date(dStr);
+  return d >= start && d <= new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59);
+}
+
+// Shaded color for the Nth set within a metric family (hue stays fixed,
+// lightness varies per set so set 1/2/3 are visually distinguishable).
+function familyColor(hue, index, total) {
+  const lightness = total <= 1 ? 45 : 65 - index * (35 / (total - 1));
+  return `hsl(${hue}, 70%, ${lightness}%)`;
 }
 
 function drawHistoryCharts() {
   const chartArea = document.getElementById("history-chart-area");
+  const tableArea = document.getElementById("history-table-area");
+
   if (!historyState.exerciseId) {
     chartArea.innerHTML = "";
+    tableArea.innerHTML = "";
     return;
   }
 
   activeCharts.forEach(c => c.destroy());
   activeCharts = [];
 
-  const points = [];
+  // sessionByLabel: date-key -> { session, exResult } for every matching,
+  // in-range session for this exercise. Used to build lines AND to look
+  // up the exact data when a point is clicked.
+  const sessionByLabel = {};
+  let maxSets = 0;
 
   appData.sessions.forEach(session => {
     if (!isWithinRange(session.date, historyState.range)) return;
-
     const exResult = session.exercises.find(ex => ex.exerciseId === historyState.exerciseId);
     if (!exResult || exResult.sets.length === 0) return;
 
-    const weights = exResult.sets.map(s => s.weight);
-    const rpes = exResult.sets.map(s => s.rpe);
-
-    points.push({
-      date: session.date,
-      avgWeight: weights.reduce((a, b) => a + b, 0) / weights.length,
-      maxWeight: Math.max(...weights),
-      avgRpe: rpes.reduce((a, b) => a + b, 0) / rpes.length,
-      feel: exResult.feel
-    });
+    const key = dateKey(new Date(session.date));
+    sessionByLabel[key] = { session, exResult };
+    maxSets = Math.max(maxSets, exResult.sets.length);
   });
 
-  points.sort((a, b) => new Date(a.date) - new Date(b.date));
+  const loggedLabels = Object.keys(sessionByLabel).sort();
 
-  if (points.length === 0) {
+  if (loggedLabels.length === 0) {
     chartArea.innerHTML = `<p class="empty-msg">No logged data for this exercise in this range.</p>`;
+    tableArea.innerHTML = "";
     return;
   }
 
-  const labels = points.map(p => new Date(p.date).toLocaleDateString());
+  const labels = historyState.calendarMode ? generateCalendarLabels(historyState.range) : loggedLabels;
 
-  chartArea.innerHTML = `
-    <h3>Weight Progression</h3>
-    <canvas id="chart-weight"></canvas>
-    <h3>RPE Trend</h3>
-    <canvas id="chart-rpe"></canvas>
-    <h3>Feel Rating Trend</h3>
-    <canvas id="chart-feel"></canvas>
-  `;
+  const datasets = [];
 
-  const weightChart = new Chart(document.getElementById("chart-weight"), {
+  if (historyState.metrics.weight) {
+    for (let i = 0; i < maxSets; i++) {
+      datasets.push({
+        label: `Weight - Set ${i + 1}`,
+        data: labels.map(l => sessionByLabel[l]?.exResult.sets[i]?.weight ?? null),
+        borderColor: familyColor(210, i, maxSets),
+        yAxisID: "yWeight",
+        spanGaps: false
+      });
+    }
+  }
+
+  if (historyState.metrics.reps) {
+    for (let i = 0; i < maxSets; i++) {
+      datasets.push({
+        label: `Reps - Set ${i + 1}`,
+        data: labels.map(l => sessionByLabel[l]?.exResult.sets[i]?.reps ?? null),
+        borderColor: familyColor(30, i, maxSets),
+        yAxisID: "yReps",
+        spanGaps: false
+      });
+    }
+  }
+
+  if (historyState.metrics.rpe) {
+    for (let i = 0; i < maxSets; i++) {
+      datasets.push({
+        label: `RPE - Set ${i + 1}`,
+        data: labels.map(l => sessionByLabel[l]?.exResult.sets[i]?.rpe ?? null),
+        borderColor: familyColor(270, i, maxSets),
+        yAxisID: "yRpeFeel",
+        spanGaps: false
+      });
+    }
+  }
+
+  if (historyState.metrics.feel) {
+    datasets.push({
+      label: "Feel",
+      data: labels.map(l => sessionByLabel[l]?.exResult.feel ?? null),
+      borderColor: "hsl(150, 60%, 40%)",
+      yAxisID: "yRpeFeel",
+      spanGaps: false
+    });
+  }
+
+  chartArea.innerHTML = `<canvas id="chart-progress"></canvas>`;
+
+  const scales = {};
+  if (historyState.metrics.weight) {
+    scales.yWeight = { type: "linear", position: "left", title: { display: true, text: "Weight (kg)" } };
+  }
+  if (historyState.metrics.reps) {
+    scales.yReps = { type: "linear", position: "right", title: { display: true, text: "Reps" }, grid: { drawOnChartArea: false } };
+  }
+  if (historyState.metrics.rpe || historyState.metrics.feel) {
+    scales.yRpeFeel = { type: "linear", position: "right", min: 0, max: 10, title: { display: true, text: "RPE / Feel" }, grid: { drawOnChartArea: false } };
+  }
+
+  const chart = new Chart(document.getElementById("chart-progress"), {
     type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: "Max Weight", data: points.map(p => p.maxWeight), borderColor: "#e63946", fill: false },
-        { label: "Avg Weight", data: points.map(p => p.avgWeight), borderColor: "#457b9d", fill: false }
-      ]
-    },
-    options: { responsive: true }
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      scales,
+      onClick: (evt, elements) => {
+        if (elements.length === 0) return;
+        const index = elements[0].index;
+        historyState.selectedLabel = labels[index];
+        renderSessionTable();
+      }
+    }
   });
 
-  const rpeChart = new Chart(document.getElementById("chart-rpe"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: "Avg RPE", data: points.map(p => p.avgRpe), borderColor: "#f4a261", fill: false }
-      ]
-    },
-    options: { responsive: true, scales: { y: { min: 0, max: 10 } } }
-  });
+  activeCharts = [chart];
 
-  const feelChart = new Chart(document.getElementById("chart-feel"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: "Feel", data: points.map(p => p.feel), borderColor: "#2a9d8f", fill: false }
-      ]
-    },
-    options: { responsive: true, scales: { y: { min: 0, max: 10 } } }
-  });
+  // sessionByLabel needs to survive until the click handler runs later,
+  // so stash it where renderSessionTable can reach it.
+  drawHistoryCharts._sessionByLabel = sessionByLabel;
 
-  activeCharts = [weightChart, rpeChart, feelChart];
+  renderSessionTable();
+}
+
+function renderSessionTable() {
+  const tableArea = document.getElementById("history-table-area");
+  const key = historyState.selectedLabel;
+  const sessionByLabel = drawHistoryCharts._sessionByLabel || {};
+
+  if (!key || !sessionByLabel[key]) {
+    tableArea.innerHTML = `<p class="empty-msg">Tap a point on the graph to see that day's exact numbers.</p>`;
+    return;
+  }
+
+  const { session, exResult } = sessionByLabel[key];
+
+  let html = `<h3>${escapeHtml(session.dayName)} — ${new Date(session.date).toLocaleDateString()}</h3>`;
+  html += `<table class="session-table"><thead><tr><th>Set</th><th>Weight</th><th>Reps</th><th>RPE</th></tr></thead><tbody>`;
+  exResult.sets.forEach((s, i) => {
+    html += `<tr><td>${i + 1}</td><td>${s.weight}kg</td><td>${s.reps}</td><td>${s.rpe}</td></tr>`;
+  });
+  html += `</tbody></table>`;
+  html += `<p class="feel-line">Feel rating: <strong>${exResult.feel}</strong> / 10</p>`;
+
+  tableArea.innerHTML = html;
 }
 
 // ============================================================
