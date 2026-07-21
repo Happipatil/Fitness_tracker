@@ -469,8 +469,8 @@ function renderHistoryTab() {
   });
   html += `</select>`;
 
-  html += `<select id="history-range-select">`;
-  ["day", "week", "month", "year"].forEach(r => {
+html += `<select id="history-range-select">`;
+  ["week", "month", "year"].forEach(r => {
     const selected = r === historyState.range ? "selected" : "";
     html += `<option value="${r}" ${selected}>${r}</option>`;
   });
