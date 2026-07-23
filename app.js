@@ -210,7 +210,11 @@ function renderLogTab() {
   }
 
   if (!logState) {
+    const todayStr = new Date().toISOString().slice(0, 10);
     let html = `<h2>Start a Session</h2>`;
+    html += `<label class="session-date-label">Session date
+      <input type="date" id="log-session-date" value="${todayStr}" />
+    </label>`;
     appData.split.forEach(day => {
       html += `<button class="day-pick-btn" data-action="start-session" data-day="${day.id}">${escapeHtml(day.name)}</button>`;
     });
@@ -327,18 +331,21 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
   const action = e.target.dataset.action;
   if (!action) return;
 
-  if (action === "start-session") {
+ if (action === "start-session") {
     const dayId = e.target.dataset.day;
     const day = appData.split.find(d => d.id === dayId);
+    const dateInput = document.getElementById("log-session-date");
+    const chosenDate = dateInput.value; // "YYYY-MM-DD"
     logState = {
       day,
       exIndex: 0,
       setIndex: 0,
       exerciseResults: [],
-      pendingPrefill: null
+      pendingPrefill: null,
+      sessionDate: chosenDate
     };
     renderLogTab();
-  }
+  }}
 
   if (action === "submit-set") {
     const weight = parseFloat(document.getElementById("log-weight").value);
@@ -405,9 +412,14 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
 });
 
 function finishSession() {
+  // Noon avoids timezone rollovers accidentally shifting the date by a day.
+  const sessionDateTime = logState.sessionDate
+    ? new Date(logState.sessionDate + "T12:00:00").toISOString()
+    : new Date().toISOString();
+
   const session = {
     id: makeId(),
-    date: new Date().toISOString(),
+    date: sessionDateTime,
     dayId: logState.day.id,
     dayName: logState.day.name,
     exercises: logState.exerciseResults
@@ -609,6 +621,8 @@ function drawHistoryCharts() {
   }
 
   const labels = historyState.calendarMode ? generateCalendarLabels(historyState.range) : loggedLabels;
+  
+  const displayLabels = labels.map(l => formatLabel(l, historyState.range));
 
   const datasets = [];
 
@@ -673,7 +687,7 @@ function drawHistoryCharts() {
 
   const chart = new Chart(document.getElementById("chart-progress"), {
     type: "line",
-    data: { labels, datasets },
+    data: { labels: displayLabels, datasets },
     options: {
       responsive: true,
       scales,
