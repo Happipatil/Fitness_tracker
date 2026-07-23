@@ -526,11 +526,13 @@ document.getElementById("tab-history").addEventListener("change", (e) => {
 function getRangeBounds(range) {
   const now = new Date();
   let start, end = new Date(now);
-  if (range === "day") {
+  if (range === "week") {
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ...
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     start = new Date(now);
-  } else if (range === "week") {
-    start = new Date(now);
-    start.setDate(now.getDate() - 6);
+    start.setDate(now.getDate() + diffToMonday);
+    end = new Date(start);
+    end.setDate(start.getDate() + 6);
   } else if (range === "month") {
     start = new Date(now.getFullYear(), now.getMonth(), 1);
     end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
