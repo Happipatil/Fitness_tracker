@@ -291,3 +291,16 @@ label input {
   margin-top: 10px;
   font-size: 0.9rem;
 }
+
+
+.session-date-label {
+  display: block;
+  margin-bottom: 16px;
+  font-size: 0.95rem;
+}
+
+.session-date-label input {
+  display: block;
+  margin-top: 4px;
+  width: 100%;
+}
