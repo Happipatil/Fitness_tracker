@@ -239,9 +239,6 @@ function renderLogTab() {
   `;
 
   if (!isFeelStep) {
-    // Decide what to pre-fill. If we just pressed Back, restore the exact
-    // old values for this set. Otherwise, only pre-fill weight from the
-    // previous set (reps/RPE stay blank, but we offer quick-rep buttons).
     let prefillWeight = "";
     let prefillReps = "";
     let prefillRpe = "";
@@ -288,7 +285,6 @@ function renderLogTab() {
     `;
   }
 
-  // pendingPrefill is one-shot — clear it now that this render used it.
   logState.pendingPrefill = null;
 
   const isVeryFirstStep = logState.exIndex === 0 && logState.setIndex === 0;
@@ -301,41 +297,15 @@ function renderLogTab() {
   container.innerHTML = html;
 }
 
-
-function goBack() {
-  const day = logState.day;
-  const exercise = day.exercises[logState.exIndex];
-
-  if (logState.setIndex === 0) {
-    // First set of this exercise — step back into the previous exercise's feel rating.
-    if (logState.exIndex === 0) return; // nothing before the very first step
-    logState.exIndex--;
-    const prevExercise = day.exercises[logState.exIndex];
-    const prevResult = logState.exerciseResults.find(r => r.exerciseId === prevExercise.id);
-    logState.setIndex = prevExercise.sets; // lands back on that exercise's feel step
-    logState.pendingPrefill = { feel: prevResult.feel };
-    prevResult.feel = null;
-  } else {
-    // Mid-sets or on the feel step — step back into the last submitted set.
-    logState.setIndex--;
-    const result = logState.exerciseResults.find(r => r.exerciseId === exercise.id);
-    const removedSet = result.sets.pop();
-    logState.pendingPrefill = { weight: removedSet.weight, reps: removedSet.reps, rpe: removedSet.rpe };
-  }
-
-  renderLogTab();
-}
-
-
 document.getElementById("tab-log").addEventListener("click", (e) => {
   const action = e.target.dataset.action;
   if (!action) return;
 
- if (action === "start-session") {
+  if (action === "start-session") {
     const dayId = e.target.dataset.day;
     const day = appData.split.find(d => d.id === dayId);
     const dateInput = document.getElementById("log-session-date");
-    const chosenDate = dateInput.value; // "YYYY-MM-DD"
+    const chosenDate = dateInput.value;
     logState = {
       day,
       exIndex: 0,
@@ -345,7 +315,15 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
       sessionDate: chosenDate
     };
     renderLogTab();
-  }}
+  }
+
+  if (action === "quick-reps") {
+    document.getElementById("log-reps").value = e.target.dataset.value;
+  }
+
+  if (action === "go-back") {
+    goBack();
+  }
 
   if (action === "submit-set") {
     const weight = parseFloat(document.getElementById("log-weight").value);
@@ -397,22 +375,35 @@ document.getElementById("tab-log").addEventListener("click", (e) => {
       renderLogTab();
     }
   }
-  
-  if (action === "quick-reps") {
-    document.getElementById("log-reps").value = e.target.dataset.value;
-  }
-
-  if (action === "go-back") {
-    goBack();
-  }
 
   if (action === "log-another") {
     renderLogTab();
   }
 });
 
+function goBack() {
+  const day = logState.day;
+  const exercise = day.exercises[logState.exIndex];
+
+  if (logState.setIndex === 0) {
+    if (logState.exIndex === 0) return;
+    logState.exIndex--;
+    const prevExercise = day.exercises[logState.exIndex];
+    const prevResult = logState.exerciseResults.find(r => r.exerciseId === prevExercise.id);
+    logState.setIndex = prevExercise.sets;
+    logState.pendingPrefill = { feel: prevResult.feel };
+    prevResult.feel = null;
+  } else {
+    logState.setIndex--;
+    const result = logState.exerciseResults.find(r => r.exerciseId === exercise.id);
+    const removedSet = result.sets.pop();
+    logState.pendingPrefill = { weight: removedSet.weight, reps: removedSet.reps, rpe: removedSet.rpe };
+  }
+
+  renderLogTab();
+}
+
 function finishSession() {
-  // Noon avoids timezone rollovers accidentally shifting the date by a day.
   const sessionDateTime = logState.sessionDate
     ? new Date(logState.sessionDate + "T12:00:00").toISOString()
     : new Date().toISOString();
@@ -445,7 +436,7 @@ let historyState = {
   range: "month",
   calendarMode: false,
   metrics: { weight: true, reps: true, rpe: false, feel: false },
-  selectedLabel: null   // date-key of the point last clicked, for the table
+  selectedLabel: null
 };
 
 let activeCharts = [];
@@ -481,7 +472,7 @@ function renderHistoryTab() {
   });
   html += `</select>`;
 
-html += `<select id="history-range-select">`;
+  html += `<select id="history-range-select">`;
   ["week", "month", "year"].forEach(r => {
     const selected = r === historyState.range ? "selected" : "";
     html += `<option value="${r}" ${selected}>${r}</option>`;
@@ -539,7 +530,7 @@ function getRangeBounds(range) {
   const now = new Date();
   let start, end = new Date(now);
   if (range === "week") {
-    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ...
+    const dayOfWeek = now.getDay();
     const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     start = new Date(now);
     start.setDate(now.getDate() + diffToMonday);
@@ -559,7 +550,6 @@ function dateKey(d) {
   return d.toISOString().slice(0, 10);
 }
 
-
 function formatLabel(key, range) {
   const d = new Date(key + "T00:00:00");
   if (range === "week") {
@@ -571,7 +561,6 @@ function formatLabel(key, range) {
   }
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
-
 
 function generateCalendarLabels(range) {
   const { start, end } = getRangeBounds(range);
@@ -590,8 +579,6 @@ function isWithinRange(dStr, range) {
   return d >= start && d <= new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59);
 }
 
-// Shaded color for the Nth set within a metric family (hue stays fixed,
-// lightness varies per set so set 1/2/3 are visually distinguishable).
 function familyColor(hue, index, total) {
   const lightness = total <= 1 ? 45 : 65 - index * (35 / (total - 1));
   return `hsl(${hue}, 70%, ${lightness}%)`;
@@ -610,9 +597,6 @@ function drawHistoryCharts() {
   activeCharts.forEach(c => c.destroy());
   activeCharts = [];
 
-  // sessionByLabel: date-key -> { session, exResult } for every matching,
-  // in-range session for this exercise. Used to build lines AND to look
-  // up the exact data when a point is clicked.
   const sessionByLabel = {};
   let maxSets = 0;
 
@@ -635,7 +619,6 @@ function drawHistoryCharts() {
   }
 
   const labels = historyState.calendarMode ? generateCalendarLabels(historyState.range) : loggedLabels;
-  
   const displayLabels = labels.map(l => formatLabel(l, historyState.range));
 
   const datasets = [];
@@ -716,8 +699,6 @@ function drawHistoryCharts() {
 
   activeCharts = [chart];
 
-  // sessionByLabel needs to survive until the click handler runs later,
-  // so stash it where renderSessionTable can reach it.
   drawHistoryCharts._sessionByLabel = sessionByLabel;
 
   renderSessionTable();
