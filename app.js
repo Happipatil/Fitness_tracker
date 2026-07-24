@@ -685,8 +685,8 @@ function drawHistoryCharts() {
   const chartWidth = Math.max(340, displayLabels.length * 70);
 
   chartArea.innerHTML = `
-    <div class="chart-scroll">
-      <canvas id="chart-progress" width="${chartWidth}" height="320"></canvas>
+    <div class="chart-scroll" style="width: ${chartWidth}px;">
+      <canvas id="chart-progress"></canvas>
     </div>
   `;
 
@@ -716,7 +716,7 @@ function drawHistoryCharts() {
     type: "line",
     data: { labels: displayLabels, datasets },
     options: {
-      responsive: false,
+      responsive: true,
       maintainAspectRatio: false,
       scales,
       onClick: (evt, elements) => {
@@ -757,6 +757,11 @@ function renderSessionTable() {
 
   tableArea.innerHTML = html;
 }
+
+// Redraw the chart on rotation so it picks up the new available height/width.
+window.addEventListener("resize", () => {
+  if (historyState.exerciseId) drawHistoryCharts();
+});
 
 // ============================================================
 // STARTUP
