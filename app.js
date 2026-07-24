@@ -580,8 +580,10 @@ function isWithinRange(dStr, range) {
 }
 
 function familyColor(hue, index, total) {
-  const lightness = total <= 1 ? 45 : 65 - index * (35 / (total - 1));
-  return `hsl(${hue}, 70%, ${lightness}%)`;
+  // Narrower lightness range (55 down to 35) so sets within one metric
+  // family read as "shades of the same color", not visually scattered.
+  const lightness = total <= 1 ? 45 : 55 - index * (20 / (total - 1));
+  return `hsl(${hue}, 75%, ${lightness}%)`;
 }
 
 function drawHistoryCharts() {
@@ -669,24 +671,53 @@ function drawHistoryCharts() {
     });
   }
 
-  chartArea.innerHTML = `<canvas id="chart-progress"></canvas>`;
+// Find the highest weight value logged, to decide the increment size.
+  let maxWeightValue = 0;
+  Object.values(sessionByLabel).forEach(v => {
+    v.exResult.sets.forEach(s => {
+      if (s.weight > maxWeightValue) maxWeightValue = s.weight;
+    });
+  });
+  const weightStep = maxWeightValue > 60 ? 5 : 2.5;
+
+  // Wider canvas = more room per data point = horizontal scroll instead
+  // of everything squeezed into one narrow phone-width chart.
+  const chartWidth = Math.max(340, displayLabels.length * 70);
+
+  chartArea.innerHTML = `
+    <div class="chart-scroll">
+      <canvas id="chart-progress" width="${chartWidth}" height="320"></canvas>
+    </div>
+  `;
 
   const scales = {};
   if (historyState.metrics.weight) {
-    scales.yWeight = { type: "linear", position: "left", title: { display: true, text: "Weight (kg)" } };
+    scales.yWeight = {
+      type: "linear", position: "left", min: 0,
+      ticks: { stepSize: weightStep },
+      title: { display: true, text: "Weight (kg)" }
+    };
   }
   if (historyState.metrics.reps) {
-    scales.yReps = { type: "linear", position: "right", title: { display: true, text: "Reps" }, grid: { drawOnChartArea: false } };
+    scales.yReps = {
+      type: "linear", position: "right", min: 0,
+      title: { display: true, text: "Reps" }, grid: { drawOnChartArea: false }
+    };
   }
   if (historyState.metrics.rpe || historyState.metrics.feel) {
-    scales.yRpeFeel = { type: "linear", position: "right", min: 0, max: 10, title: { display: true, text: "RPE / Feel" }, grid: { drawOnChartArea: false } };
+    scales.yRpeFeel = {
+      type: "linear", position: "right", min: 0, max: 10,
+      ticks: { stepSize: 1 },
+      title: { display: true, text: "RPE / Feel" }, grid: { drawOnChartArea: false }
+    };
   }
 
   const chart = new Chart(document.getElementById("chart-progress"), {
     type: "line",
     data: { labels: displayLabels, datasets },
     options: {
-      responsive: true,
+      responsive: false,
+      maintainAspectRatio: false,
       scales,
       onClick: (evt, elements) => {
         if (elements.length === 0) return;
