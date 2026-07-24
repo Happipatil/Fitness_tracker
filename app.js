@@ -580,10 +580,10 @@ function isWithinRange(dStr, range) {
 }
 
 function familyColor(hue, index, total) {
-  // Narrower lightness range (55 down to 35) so sets within one metric
-  // family read as "shades of the same color", not visually scattered.
-  const lightness = total <= 1 ? 45 : 55 - index * (20 / (total - 1));
-  return `hsl(${hue}, 75%, ${lightness}%)`;
+  // Higher lightness, lower saturation = softer, more faded look,
+  // while still keeping a visible step between set 1/2/3 etc.
+  const lightness = total <= 1 ? 55 : 75 - index * (25 / (total - 1));
+  return `hsl(${hue}, 45%, ${lightness}%)`;
 }
 
 function drawHistoryCharts() {
